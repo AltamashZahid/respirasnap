@@ -190,31 +190,102 @@ def _compare_segments(user_segs: List[Dict], ref_segs: List[Dict]) -> Dict:
     }
 
 
-def _generate_recommendations(pose_cmp: Dict, breathing_cmp: Dict, 
+def _generate_recommendations(pose_cmp: Dict, breathing_cmp: Dict,
                               segment_cmp: Dict) -> List[str]:
     """Generate actionable recommendations based on comparison."""
     recs = []
-    
+
     # Pose recommendations
     if pose_cmp["pose_accuracy"] < 50:
         recs.append("🧘 Focus on holding the correct poses longer")
     elif pose_cmp["pose_accuracy"] < 80:
         recs.append("🧘 Practice smoother pose transitions")
-    
+
     # Breathing recommendations
     metrics = breathing_cmp.get("metrics_comparison", {})
     if metrics.get("bpm", {}).get("diff_pct", 0) > 20:
         ref_bpm = metrics["bpm"]["reference"]
         recs.append(f"🫁 Adjust breathing pace to ~{ref_bpm} BPM (reference)")
-    
+
     if metrics.get("inhale_exhale_ratio", {}).get("diff_pct", 0) > 30:
         recs.append("🫁 Work on inhale/exhale balance")
-    
+
     if segment_cmp["segment_accuracy"] < 60:
         recs.append("📊 Try to match the reference's inhale/exhale/hold sequence")
-    
+
     # Overall
     if len(recs) == 0:
         recs.append("✨ Excellent alignment with reference!")
-    
+
     return recs
+
+
+def format_comparison_for_display(comparison_result: Dict) -> str:
+    """Format comparison result as readable text for UI display.
+
+    Args:
+        comparison_result: Result from overall_comparison()
+
+    Returns:
+        Formatted string for display in UI
+    """
+    overall_score = comparison_result.get("overall_alignment_score", 0)
+    pose_cmp = comparison_result.get("pose_comparison", {})
+    breathing_cmp = comparison_result.get("breathing_comparison", {})
+    recs = comparison_result.get("recommendations", [])
+
+    # Score indicator
+    if overall_score >= 80:
+        score_emoji = "✨"
+    elif overall_score >= 60:
+        score_emoji = "👍"
+    else:
+        score_emoji = "💪"
+
+    text = f"""
+╔═════════════════════════════════════════════════╗
+║          ⚖️  COMPARISON ANALYSIS                 ║
+╚═════════════════════════════════════════════════╝
+
+{score_emoji} Overall Alignment Score:  {overall_score}/100
+
+─────────────────────────────────────────────────
+
+📊 BREATHING METRICS COMPARISON:
+
+"""
+
+    metrics = breathing_cmp.get("metrics_comparison", {})
+    for key, data in metrics.items():
+        label = data.get("label", key)
+        user_val = data.get("user", 0)
+        ref_val = data.get("reference", 0)
+        diff = data.get("diff_pct", 0)
+        unit = data.get("unit", "")
+
+        # Color indicator based on difference
+        if diff < 10:
+            indicator = "✓"
+        elif diff < 25:
+            indicator = "⚠"
+        else:
+            indicator = "✗"
+
+        text += f"  {indicator} {label:20s}  You: {user_val:6.2f}  Ref: {ref_val:6.2f}  Diff: {diff:5.1f}%\n"
+
+    text += f"\n  Breathing Alignment Score: {breathing_cmp.get('breathing_alignment_score', 0)}/100\n"
+
+    # Pose comparison if available
+    if pose_cmp.get("pose_accuracy", 0) > 0:
+        text += f"\n🧘 POSE ACCURACY: {pose_cmp.get('pose_accuracy', 0):.1f}%\n"
+        text += f"   Matching Poses: {pose_cmp.get('matching_poses', 0)}/{pose_cmp.get('total_poses', 0)}\n"
+
+    # Segment comparison
+    text += f"\n📈 BREATH PATTERN ALIGNMENT: {comparison_result.get('segment_comparison', {}).get('segment_accuracy', 0):.1f}%\n"
+
+    # Recommendations
+    text += "\n💡 RECOMMENDATIONS:\n"
+    for rec in recs:
+        text += f"   • {rec}\n"
+
+    return text
