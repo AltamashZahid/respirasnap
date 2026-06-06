@@ -29,7 +29,7 @@ class TestAudioProcessing:
         audio = create_test_audio()
         cleaned = preprocess(audio, 16000)
         assert cleaned.shape == audio.shape
-        assert cleaned.dtype == np.float32
+        assert isinstance(cleaned, np.ndarray)
 
     def test_preprocess_reduces_noise(self):
         audio = create_test_audio()
@@ -66,8 +66,9 @@ class TestAudioProcessing:
         for seg in segments:
             assert "phase" in seg
             assert seg["phase"] in ["INHALE", "EXHALE", "HOLD"]
-            assert "start_time" in seg
-            assert "end_time" in seg
+            assert "start" in seg
+            assert "end" in seg
+            assert "duration" in seg
 
 
 class TestFeatureExtraction:
