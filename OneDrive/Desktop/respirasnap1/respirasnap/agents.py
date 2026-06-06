@@ -6,7 +6,9 @@ Three agents: Clinical Summary, Coaching, Follow-up
 import json
 import os
 from groq import Groq
+from dotenv import load_dotenv
 
+load_dotenv()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 MODEL = "llama-3.1-8b-instant"
@@ -15,7 +17,7 @@ MODEL = "llama-3.1-8b-instant"
 def _call(system_prompt: str, user_content: str) -> str:
     """Single Groq LLM call."""
     if not GROQ_API_KEY:
-        return "[No Groq key]"
+        return "[LLM unavailable: Set GROQ_API_KEY in .env file]"
     try:
         client = Groq(api_key=GROQ_API_KEY)
         chat = client.chat.completions.create(
