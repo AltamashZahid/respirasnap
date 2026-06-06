@@ -220,6 +220,106 @@ def _generate_recommendations(pose_cmp: Dict, breathing_cmp: Dict,
     return recs
 
 
+def compare_two_sessions(session1: Dict, session2: Dict, name1: str = "Session 1", name2: str = "Session 2") -> Dict:
+    """Compare any two sessions from history.
+
+    Args:
+        session1: First session dict with features and score
+        session2: Second session dict with features and score
+        name1: Display name for session 1
+        name2: Display name for session 2
+
+    Returns:
+        Detailed comparison report
+    """
+    features1 = session1.get("features", {})
+    features2 = session2.get("features", {})
+    score1 = session1.get("score", 0)
+    score2 = session2.get("score", 0)
+
+    # Compare breathing patterns
+    breathing_cmp = compare_breathing_patterns(features1, features2)
+
+    # Score difference
+    score_diff = score2 - score1
+    score_trend = "improved ✓" if score_diff > 0 else "declined ✗" if score_diff < 0 else "stable ➡️"
+
+    return {
+        "session1_name": name1,
+        "session2_name": name2,
+        "score1": score1,
+        "score2": score2,
+        "score_diff": score_diff,
+        "score_trend": score_trend,
+        "breathing_comparison": breathing_cmp,
+        "timestamp1": session1.get("timestamp", ""),
+        "timestamp2": session2.get("timestamp", ""),
+    }
+
+
+def format_session_comparison(comparison: Dict) -> str:
+    """Format session-to-session comparison for display.
+
+    Args:
+        comparison: Result from compare_two_sessions()
+
+    Returns:
+        Formatted comparison string
+    """
+    name1 = comparison.get("session1_name", "Session 1")
+    name2 = comparison.get("session2_name", "Session 2")
+    score1 = comparison.get("score1", 0)
+    score2 = comparison.get("score2", 0)
+    score_diff = comparison.get("score_diff", 0)
+    trend = comparison.get("score_trend", "unknown")
+
+    text = f"""
+╔════════════════════════════════════════════════════╗
+║         📊 SESSION COMPARISON ANALYSIS             ║
+╚════════════════════════════════════════════════════╝
+
+Comparing: {name1} → {name2}
+
+Score: {score1}/100 → {score2}/100 ({score_diff:+d}) {trend}
+
+────────────────────────────────────────────────────
+
+📈 BREATHING METRICS CHANGES:
+
+"""
+
+    breathing_cmp = comparison.get("breathing_comparison", {})
+    metrics = breathing_cmp.get("metrics_comparison", {})
+
+    if metrics:
+        for key, data in metrics.items():
+            label = data.get("label", key)
+            val1 = data.get("user", 0)
+            val2 = data.get("reference", 0)
+            diff = val2 - val1
+            unit = data.get("unit", "")
+
+            if diff > 0:
+                indicator = "↑"
+            elif diff < 0:
+                indicator = "↓"
+            else:
+                indicator = "="
+
+            text += f"  {indicator} {label:18s}:  {val1:6.2f} → {val2:6.2f}  (Δ {diff:+.2f})\n"
+    else:
+        text += "  [No metric data available]\n"
+
+    alignment = breathing_cmp.get("breathing_alignment_score", 0)
+    text += f"\n  Breathing Alignment Score: {alignment}/100\n"
+
+    text += f"\n⏰ Session Timestamps:\n"
+    text += f"  Session 1: {comparison.get('timestamp1', 'Unknown')}\n"
+    text += f"  Session 2: {comparison.get('timestamp2', 'Unknown')}\n"
+
+    return text
+
+
 def format_comparison_for_display(comparison_result: Dict) -> str:
     """Format comparison result as readable text for UI display.
 

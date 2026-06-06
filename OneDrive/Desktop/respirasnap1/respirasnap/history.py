@@ -63,3 +63,25 @@ def print_history_summary():
         bpm   = s.get("features", {}).get("bpm", "?")
         print(f"  {ts}  |  Score: {sc}/100  |  BPM: {bpm}")
     print(f"{'─'*50}\n")
+
+
+def get_session_display_name(session: dict, index: int) -> str:
+    """Get display name for session dropdown."""
+    timestamp = session.get("timestamp", "unknown")[:10]
+    score = session.get("score", 0)
+    bpm = session.get("features", {}).get("bpm", 0)
+    return f"Session {index+1} ({timestamp}) - Score: {score}/100 BPM: {bpm:.1f}"
+
+
+def get_session_list() -> list[str]:
+    """Get list of session display names for dropdown."""
+    history = load_history()
+    return [get_session_display_name(s, i) for i, s in enumerate(history)]
+
+
+def get_session_by_index(index: int) -> dict:
+    """Get session data by index."""
+    history = load_history()
+    if 0 <= index < len(history):
+        return history[index]
+    return None

@@ -32,9 +32,11 @@ from segment    import segment_breathing
 from features   import extract_features
 from score      import compute_score
 from agents     import clinical_summary_agent, coaching_agent, followup_agent
-from history    import load_history, save_session
-from compare    import overall_comparison
+from history    import load_history, save_session, get_session_list, get_session_by_index
+from compare    import overall_comparison, format_comparison_for_display, compare_two_sessions, format_session_comparison
 from references import save_reference, load_reference, list_references, delete_reference, reconstruct_result
+from export     import export_session_csv, export_history_csv, export_session_json, get_default_export_filename
+from trending   import calculate_trend_stats, get_trend_summary, plot_trending_chart
 
 # ── MediaPipe (optional) ──────────────────────────────────
 try:
@@ -527,7 +529,9 @@ class BreathingPanel(tk.Frame):
         self._upl_btn = _btn(btn_row, "📂  Upload File", self._upload_file, MUTED)
         self._upl_btn.pack(side=tk.LEFT, padx=(0,6))
         self._ref_btn = _btn(btn_row, "🧘  Load Reference", self._upload_reference, ORANGE)
-        self._ref_btn.pack(side=tk.LEFT)
+        self._ref_btn.pack(side=tk.LEFT, padx=(0,6))
+        self._exp_btn = _btn(btn_row, "💾  Export", self._export_session, GREEN)
+        self._exp_btn.pack(side=tk.LEFT)
 
         # ── Reference management row ────────────────────
         ref_row = tk.Frame(ctrl, bg=PANEL)
@@ -548,6 +552,31 @@ class BreathingPanel(tk.Frame):
         
         self._del_ref_btn = _btn(ref_row, "🗑  Delete", self._delete_saved_reference, RED)
         self._del_ref_btn.pack(side=tk.LEFT)
+
+        # ── Session Comparison row ────────────────────────
+        comp_row = tk.Frame(ctrl, bg=PANEL)
+        comp_row.pack(fill=tk.X, pady=(6,0))
+
+        _lbl(comp_row, "Compare Sessions:", MUTED, 7).pack(side=tk.LEFT, padx=(0,6))
+
+        self._sess1_var = tk.StringVar(value="None")
+        self._sess1_dropdown = ttk.Combobox(
+            comp_row, textvariable=self._sess1_var, state="readonly", width=25,
+            values=get_session_list()
+        )
+        self._sess1_dropdown.pack(side=tk.LEFT, padx=(0,3))
+
+        _lbl(comp_row, "vs", MUTED, 7).pack(side=tk.LEFT, padx=(0,3))
+
+        self._sess2_var = tk.StringVar(value="None")
+        self._sess2_dropdown = ttk.Combobox(
+            comp_row, textvariable=self._sess2_var, state="readonly", width=25,
+            values=get_session_list()
+        )
+        self._sess2_dropdown.pack(side=tk.LEFT, padx=(0,6))
+
+        self._cmp_btn = _btn(comp_row, "⚔️  Compare", self._compare_sessions, ORANGE)
+        self._cmp_btn.pack(side=tk.LEFT)
 
         self._progress = ttk.Progressbar(ctrl, mode="indeterminate")
         self._progress.pack(fill=tk.X, pady=(6,2))
@@ -615,6 +644,7 @@ class BreathingPanel(tk.Frame):
         self._coaching_txt = self._add_tab(nb, "💡 Coaching")
         self._followup_txt = self._add_tab(nb, "📈 Follow-up")
         self._compare_txt = self._add_tab(nb, "⚖️  Comparison")
+        self._trends_frm = self._add_tab(nb, "📊 Trends")
 
     def _add_tab(self, nb, title):
         f = tk.Frame(nb, bg=PANEL)
@@ -893,6 +923,118 @@ class BreathingPanel(tk.Frame):
         self._ref_dropdown["values"] = refs_list
         self._ref_var.set("None")
 
+    def _export_session(self):
+        """Export current session as CSV or JSON."""
+        if not self._current_result:
+            messagebox.showwarning("No Session", "Record or upload a session first")
+            return
+
+        # Ask user format preference
+        format_choice = messagebox.askyesno("Export Format",
+                                           "Yes = CSV\nNo = JSON\n\nChoose format:")
+
+        try:
+            if format_choice:
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".csv",
+                    filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                    initialfile=get_default_export_filename("session_csv")
+                )
+                if filename:
+                    result = export_session_csv(self._current_result, filename)
+            else:
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".json",
+                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                    initialfile=get_default_export_filename("session_json")
+                )
+                if filename:
+                    result = export_session_json(self._current_result, filename)
+
+            if result.get("success"):
+                messagebox.showinfo("Export Success", result["message"])
+                self._setstatus(f"Exported: {os.path.basename(filename)}", GREEN)
+            else:
+                messagebox.showerror("Export Failed", result["message"])
+        except Exception as e:
+            messagebox.showerror("Error", f"Export failed: {e}")
+
+    def _compare_sessions(self):
+        """Compare two selected sessions from history."""
+        sess1_name = self._sess1_var.get()
+        sess2_name = self._sess2_var.get()
+
+        if sess1_name == "None" or sess2_name == "None":
+            messagebox.showwarning("Selection Required", "Select two sessions to compare")
+            return
+
+        try:
+            history = load_history()
+            if len(history) < 2:
+                messagebox.showwarning("Not Enough Sessions", "Need at least 2 sessions to compare")
+                return
+
+            # Extract indices from display names (format: "Session X (date) - Score: Y/100 BPM: Z")
+            idx1 = int(sess1_name.split()[1]) - 1
+            idx2 = int(sess2_name.split()[1]) - 1
+
+            if not (0 <= idx1 < len(history) and 0 <= idx2 < len(history)):
+                messagebox.showerror("Invalid Selection", f"Session index out of range. History has {len(history)} sessions")
+                return
+
+            sess1 = history[idx1]
+            sess2 = history[idx2]
+
+            # Perform comparison
+            comparison = compare_two_sessions(
+                sess1, sess2,
+                name1=sess1_name.split('(')[0].strip(),
+                name2=sess2_name.split('(')[0].strip()
+            )
+
+            # Display result in comparison tab
+            text = format_session_comparison(comparison)
+
+            if not text:
+                _write(self._compare_txt, "[No comparison data available]")
+            else:
+                _write(self._compare_txt, text)
+
+            self._setstatus(f"Compared: Session {idx1+1} vs {idx2+1}", GREEN)
+
+        except Exception as e:
+            import traceback
+            error_msg = f"Comparison failed: {str(e)}\n\n{traceback.format_exc()}"
+            messagebox.showerror("Error", error_msg[:500])
+            _write(self._compare_txt, f"Error: {str(e)}")
+
+    def _update_trends_display(self):
+        """Update trends tab with current history data."""
+        try:
+            history = load_history()
+            if not history:
+                _write(self._trends_frm, "No sessions yet. Record some breathing sessions to see trends!")
+                return
+
+            summary = get_trend_summary(history)
+            _write(self._trends_frm, summary)
+
+            # Clear the frame and add trending chart
+            for widget in self._trends_frm.winfo_children():
+                if isinstance(widget, tk.Frame) and hasattr(widget, 'canvas'):
+                    widget.destroy()
+
+            # Create matplotlib figure
+            fig = plot_trending_chart(history)
+            canvas_frame = tk.Frame(self._trends_frm, bg=PANEL)
+            canvas_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+            canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        except Exception as e:
+            _write(self._trends_frm, f"Error loading trends: {e}")
+
     def _on_audio_ready(self):
         self._analyzing = True
         self._setstatus("Analysing…", ORANGE)
@@ -944,12 +1086,14 @@ class BreathingPanel(tk.Frame):
         _write(self._clinical_txt, r["clinical"])
         _write(self._coaching_txt, r["coaching"])
         _write(self._followup_txt, r["followup"])
-        
+
         # Show comparison if reference is loaded
         if self._reference_result:
             comparison = overall_comparison(r, self._reference_result)
             self._show_comparison(comparison)
-        
+
+        # Update trends display with new session
+        self._update_trends_display()
         self._draw(r)
 
     def _on_error(self, msg):
@@ -961,33 +1105,7 @@ class BreathingPanel(tk.Frame):
 
     def _show_comparison(self, comparison):
         """Display comparison results in the comparison tab."""
-        overall = comparison["overall_alignment_score"]
-        pose_acc = comparison["pose_comparison"]["pose_accuracy"]
-        breathe_acc = comparison["breathing_comparison"]["breathing_alignment_score"]
-        recs = comparison["recommendations"]
-        
-        text = f"⚖️  COMPARISON ANALYSIS\n"
-        text += f"{'='*45}\n\n"
-        text += f"Overall Alignment Score: {overall}/100\n"
-        text += f"Pose Accuracy: {pose_acc}%\n"
-        text += f"Breathing Alignment: {breathe_acc}%\n\n"
-        
-        # Breathing metrics comparison
-        metrics = comparison["breathing_comparison"]["metrics_comparison"]
-        text += "📊 Breathing Metrics:\n"
-        text += f"{'─'*45}\n"
-        for key, data in metrics.items():
-            label = data["label"]
-            user_val = data["user"]
-            ref_val = data["reference"]
-            diff = data["diff_pct"]
-            text += f"{label:15} You: {user_val:>6}  Ref: {ref_val:>6}  Diff: {diff:>5}%\n"
-        
-        text += f"\n💡 Recommendations:\n"
-        text += f"{'─'*45}\n"
-        for rec in recs:
-            text += f"• {rec}\n"
-        
+        text = format_comparison_for_display(comparison)
         _write(self._compare_txt, text)
 
     # ── Plot ─────────────────────────────────────────────
