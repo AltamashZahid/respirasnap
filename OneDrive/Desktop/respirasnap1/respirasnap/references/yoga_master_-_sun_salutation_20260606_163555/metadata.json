@@ -1,0 +1,18 @@
+{
+  "name": "Yoga Master - Sun Salutation",
+  "ref_id": "yoga_master_-_sun_salutation_20260606_163555",
+  "created": "2026-06-06T16:35:55.151560",
+  "original_path": "my_recording",
+  "features": {
+    "bpm": 12.0,
+    "inhale_exhale_ratio": 3.065,
+    "stability_cv": 0.2474,
+    "interruptions": 0,
+    "avg_inhale_s": 0.577,
+    "avg_exhale_s": 1.768,
+    "holds_detected": 3,
+    "num_cycles": 3,
+    "audio_duration_s": 15.0
+  },
+  "pose_data_count": 150
+}

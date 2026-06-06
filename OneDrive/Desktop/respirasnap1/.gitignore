@@ -1,0 +1,15 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.DS_Store
+*.png
+*.mp3
+*.wav
+.env
+.env.local
+session_history.json
+analysis.png
