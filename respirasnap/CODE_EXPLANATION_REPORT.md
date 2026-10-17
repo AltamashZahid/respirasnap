@@ -285,11 +285,11 @@ python app.py                     # Launch GUI
 **Purpose:** Full-featured desktop application with dual panes
 
 **Layout:**
-- **Left Pane:** Posture detection (MediaPipe pose landmarker)
-  - Live webcam feed
-  - Skeleton overlay (17 landmarks)
-  - Pose classification (good/bad posture)
-  - Pose history log
+- **Left Pane:** Yoga posture (MediaPipe pose landmarker, see `pose.py`)
+  - Live webcam feed — the only place the camera is opened
+  - Skeleton overlay + pose label (Mountain, Warrior II, Tree, Chair, …)
+  - Live "Match %" against the reference pose while recording
+  - Pose-change log
 
 - **Right Pane:** Breathing analysis
   - Record/Upload buttons
@@ -303,6 +303,17 @@ python app.py                     # Launch GUI
 - Dark theme (GitHub palette)
 - Threading for non-blocking audio recording
 - Real-time visualization updates
+
+---
+
+### 13. **pose.py / compare.py** — Posture + Breathing Matching
+**Purpose:** Score a session against a reference (e.g. an instructor video)
+
+- Each frame → 9 joint angles (elbows, shoulders, hips, knees, torso tilt); invisible joints are skipped
+- Frame similarity = 100 × (1 − RMS angle error / 60°), reference also tried mirrored
+- Sequences aligned with DTW, so the user can lag the reference a little
+- Breathing: metric closeness (BPM, IE ratio, stability, inhale/exhale length) + inhale/exhale timeline agreement with ±2 s lag
+- Overall = weighted average (40/35/25) of the available components
 
 ---
 

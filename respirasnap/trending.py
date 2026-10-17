@@ -4,7 +4,7 @@ trending.py — Calculate and visualize breathing trends over multiple sessions
 
 import numpy as np
 from typing import Dict, List, Optional
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from datetime import datetime
 
 
@@ -36,6 +36,7 @@ def calculate_trend_stats(history_list: List[Dict]) -> Dict:
             "avg_score": 0,
             "improvement_pct": 0,
             "session_count": 0,
+            "score_trend": [],
             "bpm_trend": [],
             "stability_trend": [],
             "ie_ratio_trend": [],
@@ -77,6 +78,7 @@ def calculate_trend_stats(history_list: List[Dict]) -> Dict:
         "avg_score": round(avg_score, 1),
         "improvement_pct": round(improvement_pct, 1),
         "session_count": len(history_list),
+        "score_trend": scores,
         "bpm_trend": bpms,
         "stability_trend": stabilities,
         "ie_ratio_trend": ie_ratios,
@@ -154,14 +156,16 @@ def plot_trending_chart(history_list: List[Dict], save_path: Optional[str] = Non
     stats = calculate_trend_stats(history_list)
 
     if stats["session_count"] == 0:
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig = Figure(figsize=(10, 4))
+        ax = fig.add_subplot(111)
         ax.text(0.5, 0.5, "No sessions yet.\nRecord a breathing session to see trends.",
                 ha='center', va='center', fontsize=14, transform=ax.transAxes)
         ax.axis('off')
         return fig
 
     # Create figure with 3 subplots
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 9))
+    fig = Figure(figsize=(12, 9))
+    ax1, ax2, ax3 = fig.subplots(3, 1)
     fig.patch.set_facecolor('#0D1117')
 
     session_nums = list(range(1, len(stats["timestamps"]) + 1))
@@ -169,7 +173,7 @@ def plot_trending_chart(history_list: List[Dict], save_path: Optional[str] = Non
 
     # Plot 1: Score Trend
     ax1.set_facecolor('#161B22')
-    ax1.plot(session_nums, stats["bpm_trend"], 'o-', color='#56D364', linewidth=2, markersize=6, label='Score')
+    ax1.plot(session_nums, stats["score_trend"], 'o-', color='#56D364', linewidth=2, markersize=6, label='Score')
     ax1.set_ylabel('Breathing Score', color='#E6EDF3', fontsize=10, fontweight='bold')
     ax1.set_ylim(0, 110)
     ax1.grid(True, alpha=0.2, color='#30363D')
@@ -203,9 +207,9 @@ def plot_trending_chart(history_list: List[Dict], save_path: Optional[str] = Non
     ax3.tick_params(colors='#E6EDF3')
     ax3.set_xticks(x_ticks)
 
-    plt.tight_layout()
+    fig.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, facecolor='#0D1117', edgecolor='none', dpi=100)
+        fig.savefig(save_path, facecolor='#0D1117', edgecolor='none', dpi=100)
 
     return fig

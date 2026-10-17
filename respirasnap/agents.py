@@ -38,14 +38,14 @@ def _call(system_prompt: str, user_content: str) -> str:
 
 CLINICAL_SYSTEM = """
 You are a respiratory health assistant.
-Given breathing metrics from a 15-second audio snapshot, write a 2-3 sentence
+Given breathing metrics from a short audio recording (duration in audio_duration_s), write a 2-3 sentence
 plain-English clinical summary. Focus on rhythm, exhale ratio, and irregularities.
 Do not diagnose. Mention confidence level if data is limited. Be concise and factual.
 """
 
 def clinical_summary_agent(features: dict) -> str:
     return _call(CLINICAL_SYSTEM,
-                 f"Breathing metrics (15s snapshot):\n{json.dumps(features, indent=2)}")
+                 f"Breathing metrics:\n{json.dumps(features, indent=2)}")
 
 
 # ── Agent 2: Coaching ──────────────────────────────────────

@@ -21,7 +21,13 @@ def extract_features(segments: list[dict],
     # One cycle ≈ one inhale + one exhale
     num_cycles = min(len(inhales), len(exhales))
     duration_min = audio_duration / 60.0
-    bpm = round(num_cycles / duration_min, 2) if duration_min > 0 else 0.0
+    # Prefer the median peak-to-peak interval: counting only complete cycles in a
+    # short window under-reads the rate (e.g. 2 vs 3 cycles in 15 s = 8 vs 12 BPM).
+    peak_times = np.asarray(peaks.get("peak_times", []), dtype=float)
+    if len(peak_times) >= 3 and num_cycles > 0:
+        bpm = round(60.0 / float(np.median(np.diff(peak_times))), 2)
+    else:
+        bpm = round(num_cycles / duration_min, 2) if duration_min > 0 else 0.0
 
     # Average durations
     avg_inhale = float(np.mean([s["duration"] for s in inhales])) if inhales else 0.0

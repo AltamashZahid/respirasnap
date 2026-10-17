@@ -9,7 +9,12 @@ Usage:
 """
 
 import argparse
+import sys
 import numpy as np
+
+for _stream in (sys.stdout, sys.stderr):  # emoji logs must not crash on cp1252 consoles
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 from audio      import record_mic, load_file
 from preprocess import preprocess
